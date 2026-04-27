@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Tracker Pro</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-black text-white p-5">
+
+<h1 class="text-3xl mb-4">🔥 Tracker Pro</h1>
+
+<div id="stats" class="mb-4"></div>
+
+<button onclick="addTask()" class="bg-blue-500 px-3 py-1 mb-2">Add Task</button>
+
+<div id="tasks"></div>
+
+<hr class="my-4">
+
+<h2>📊 Trackers</h2>
+
+<input id="water" placeholder="Water (L)" class="text-black"><button onclick="save('water')">Save</button><br>
+<input id="study" placeholder="Study (hrs)" class="text-black"><button onclick="save('study')">Save</button><br>
+<input id="workout" placeholder="Workout" class="text-black"><button onclick="save('workout')">Save</button><br>
+<input id="sleep" placeholder="Sleep" class="text-black"><button onclick="save('sleep')">Save</button><br>
+<input id="mood" placeholder="Mood" class="text-black"><button onclick="save('mood')">Save</button><br>
+<input id="expense" placeholder="Expense" class="text-black"><button onclick="save('expense')">Save</button><br>
+<input id="income" placeholder="Income" class="text-black"><button onclick="save('income')">Save</button><br>
+
+<hr class="my-4">
+
+<h2>🤖 AI Suggestion</h2>
+<div id="ai"></div>
+
+<script>
+const userId = "user1";
+
+async function load(){
+  const tasks = await fetch(`http://localhost:5000/tasks/${userId}`).then(r=>r.json());
+  const progress = await fetch(`http://localhost:5000/progress/${userId}`).then(r=>r.json());
+  const ai = await fetch(`http://localhost:5000/ai`).then(r=>r.json());
+
+  document.getElementById("stats").innerHTML =
+    `Progress: ${progress.percent.toFixed(0)}% (${progress.done}/${progress.total})`;
+
+  document.getElementById("tasks").innerHTML = tasks.map(t=>`
+    <div>
+      <input type="checkbox" ${t.completed?"checked":""}
+        onclick="toggle('${t._id}', ${t.completed})">
+      ${t.title}
+      <button onclick="del('${t._id}')">X</button>
+    </div>
+  `).join("");
+
+  document.getElementById("ai").innerText = ai.tip;
+}
+
+async function addTask(){
+  const title = prompt("Task?");
+  await fetch("http://localhost:5000/task",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({title,userId,completed:false})
+  });
+  load();
+}
+
+async function toggle(id,status){
+  await fetch(`http://localhost:5000/task/${id}`,{
+    method:"PUT",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({completed:!status})
+  });
+
+  await fetch(`http://localhost:5000/xp/${userId}`,{method:"POST"});
+  load();
+}
+
+async function del(id){
+  await fetch(`http://localhost:5000/task/${id}`,{method:"DELETE"});
+  load();
+}
+
+async function save(type){
+  const value = document.getElementById(type).value;
+
+  await fetch("http://localhost:5000/tracker",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({userId,[type]:value})
+  });
+}
+
+load();
+</script>
+
+</body>
+</html>
