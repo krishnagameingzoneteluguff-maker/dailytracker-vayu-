@@ -1,96 +1,108 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Tracker Pro</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <title>Vayu Tracker</title>
+  <style>
+    body { font-family: Arial; background: #111; color: white; text-align: center; }
+    input { padding: 10px; }
+    button { padding: 10px; margin: 5px; }
+    li { margin: 10px; }
+  </style>
 </head>
-<body class="bg-black text-white p-5">
+<body>
 
-<h1 class="text-3xl mb-4">🔥 Tracker Pro</h1>
+<h1>🔥 Vayu Daily Tracker</h1>
 
-<div id="stats" class="mb-4"></div>
+<h3 id="streak">Streak: 0 🔥</h3>
+<h3 id="xp">XP: 0 ⚡</h3>
+<h3 id="progress">Progress: 0%</h3>
 
-<button onclick="addTask()" class="bg-blue-500 px-3 py-1 mb-2">Add Task</button>
+<input type="text" id="taskInput" placeholder="Enter task">
+<button onclick="addTask()">Add</button>
 
-<div id="tasks"></div>
-
-<hr class="my-4">
-
-<h2>📊 Trackers</h2>
-
-<input id="water" placeholder="Water (L)" class="text-black"><button onclick="save('water')">Save</button><br>
-<input id="study" placeholder="Study (hrs)" class="text-black"><button onclick="save('study')">Save</button><br>
-<input id="workout" placeholder="Workout" class="text-black"><button onclick="save('workout')">Save</button><br>
-<input id="sleep" placeholder="Sleep" class="text-black"><button onclick="save('sleep')">Save</button><br>
-<input id="mood" placeholder="Mood" class="text-black"><button onclick="save('mood')">Save</button><br>
-<input id="expense" placeholder="Expense" class="text-black"><button onclick="save('expense')">Save</button><br>
-<input id="income" placeholder="Income" class="text-black"><button onclick="save('income')">Save</button><br>
-
-<hr class="my-4">
-
-<h2>🤖 AI Suggestion</h2>
-<div id="ai"></div>
+<ul id="taskList"></ul>
 
 <script>
-const userId = "user1";
+const API = "http://localhost:3000";
 
-async function load(){
-  const tasks = await fetch(`http://localhost:5000/tasks/${userId}`).then(r=>r.json());
-  const progress = await fetch(`http://localhost:5000/progress/${userId}`).then(r=>r.json());
-  const ai = await fetch(`http://localhost:5000/ai`).then(r=>r.json());
+async function loadTasks() {
+  const res = await fetch(API + "/tasks");
+  const tasks = await res.json();
 
-  document.getElementById("stats").innerHTML =
-    `Progress: ${progress.percent.toFixed(0)}% (${progress.done}/${progress.total})`;
+  let list = document.getElementById("taskList");
+  list.innerHTML = "";
 
-  document.getElementById("tasks").innerHTML = tasks.map(t=>`
-    <div>
-      <input type="checkbox" ${t.completed?"checked":""}
-        onclick="toggle('${t._id}', ${t.completed})">
-      ${t.title}
-      <button onclick="del('${t._id}')">X</button>
-    </div>
-  `).join("");
+  let completed = 0;
 
-  document.getElementById("ai").innerText = ai.tip;
-}
+  tasks.forEach(task => {
+    if (task.completed) completed++;
 
-async function addTask(){
-  const title = prompt("Task?");
-  await fetch("http://localhost:5000/task",{
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({title,userId,completed:false})
-  });
-  load();
-}
+    let li = document.createElement("li");
 
-async function toggle(id,status){
-  await fetch(`http://localhost:5000/task/${id}`,{
-    method:"PUT",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({completed:!status})
+    li.innerHTML = `
+      <input type="checkbox" ${task.completed ? "checked" : ""} 
+        onchange="toggleTask('${task._id}')">
+      <span style="${task.completed ? 'text-decoration: line-through;' : ''}">
+        ${task.text}
+      </span>
+      <button onclick="deleteTask('${task._id}')">❌</button>
+    `;
+
+    list.appendChild(li);
   });
 
-  await fetch(`http://localhost:5000/xp/${userId}`,{method:"POST"});
-  load();
+  updateStats(tasks.length, completed);
 }
 
-async function del(id){
-  await fetch(`http://localhost:5000/task/${id}`,{method:"DELETE"});
-  load();
-}
+async function addTask() {
+  let input = document.getElementById("taskInput");
 
-async function save(type){
-  const value = document.getElementById(type).value;
+  if (input.value === "") return;
 
-  await fetch("http://localhost:5000/tracker",{
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({userId,[type]:value})
+  await fetch(API + "/tasks", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text: input.value })
   });
+
+  input.value = "";
+  loadTasks();
 }
 
-load();
+async function toggleTask(id) {
+  await fetch(API + "/tasks/" + id, {
+    method: "PUT"
+  });
+  loadTasks();
+}
+
+async function deleteTask(id) {
+  await fetch(API + "/tasks/" + id, {
+    method: "DELETE"
+  });
+  loadTasks();
+}
+
+function updateStats(total, completed) {
+  let percent = total === 0 ? 0 : (completed / total) * 100;
+
+  document.getElementById("progress").innerText =
+    `Progress: ${completed}/${total} (${percent.toFixed(0)}%)`;
+
+  let xp = completed * 10;
+  document.getElementById("xp").innerText = `XP: ${xp} ⚡`;
+
+  let streak = localStorage.getItem("streak") || 0;
+
+  if (total > 0 && completed === total) {
+    streak++;
+    localStorage.setItem("streak", streak);
+  }
+
+  document.getElementById("streak").innerText = `Streak: ${streak} 🔥`;
+}
+
+loadTasks();
 </script>
 
 </body>
